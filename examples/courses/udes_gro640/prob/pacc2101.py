@@ -41,13 +41,26 @@ def dh2T( r , d , theta, alpha ):
             Matrice de transformation
 
     """
+
     
     T = np.zeros((4,4))
-    
-    ###################
-    # Votre code ici
-    ###################
-    
+
+    T[0,0] = np.cos(theta)
+    T[0,1] = -np.sin(theta)*np.cos(alpha)
+    T[0,2] = np.sin(theta)*np.sin(alpha)
+    T[0,3] = r*np.cos(theta)
+
+    T[1,0] = np.sin(theta)
+    T[1,1] = np.cos(theta)*np.cos(alpha)
+    T[1,2] = -np.cos(theta)*np.sin(alpha)
+    T[1,3] = r*np.sin(theta)
+
+    T[2,1] = np.sin(alpha)
+    T[2,2] = np.cos(alpha)
+    T[2,3] = d
+
+    T[3,3] = 1
+
     return T
 
 
@@ -70,12 +83,15 @@ def dhs2T( r , d , theta, alpha ):
               Matrice de transformation totale de l'outil
 
     """
+    WTT = np.zeros((4, 4))
+
+    for i in range(np.size(r)):
+        T = dh2T(r[i], d[i], theta[i], alpha[i])
+        if i == 0:
+            WTT = T
+        else:
+            WTT = WTT@T
     
-    WTT = np.zeros((4,4))
-    
-    ###################
-    # Votre code ici
-    ###################
     
     return WTT
 
@@ -96,10 +112,24 @@ def f(q):
 
     """
     r = np.zeros((3,1))
+
+    DDL = len(q)
+    DH  = np.zeros((DDL,4))
+
+    # Defining DH parameters
+    DH[0,:] = [0.033, 0.08, q[0], -np.pi/2]
+    DH[1,:] = [0.155, 0, q[1]- (np.pi/2), 0]
+    DH[2,:] = [0.135, 0, q[2], 0]
+    DH[3,:] = [0, 0, q[3] + (np.pi/2), np.pi/2]
+    DH[4,:] = [0, 0.217, q[4], 0]
+
+    # Computing the transformation matrix from the base to the tool
+    T_tool_world = dhs2T(DH[:,0], DH[:,1], DH[:,2], DH[:,3])
+
+    r = T_tool_world[0:3, 3]
+
     
-    ###################
-    # Votre code ici
-    ###################
+
     
     return r
 
@@ -141,13 +171,20 @@ class CustomPositionController( EndEffectorKinematicController ) :
         
         # Jacobian computation
         J = self.J( q )
+        J_obj2 = 
         
-        # Ref
+        # Ref and objectives
+        # Primary objectif
         r_desired   = r
         r_actual    = self.fwd_kin( q )
-        
+
         # Error
         e  = r_desired - r_actual
+        q_e = self.q_d - q
+
+        # Effector space speed
+        dr_r = e * self.gains
+        dq_null = q_e * self.gains_null
         
         ################
         dq = np.zeros( self.m )  # place-holder de bonne dimension
@@ -155,8 +192,10 @@ class CustomPositionController( EndEffectorKinematicController ) :
         ##################################
         # Votre loi de commande ici !!!
         ##################################
+        J_pinv = np.linalg.pinv( J )
+        Null_p = np.identity( self.dof ) - np.dot( J_pinv , J ) # Null space projection matrix
+        dq_r = np.dot( J_pinv , dr_r ) + np.dot( Null_p, dq_null ) # Joint space speed
 
-        
         return dq
     
     
