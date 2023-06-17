@@ -20,12 +20,14 @@ ctl = CustomPositionController( sys )
 
 # Cible de position pour l'effecteur
 ctl.rbar = np.array([0,-1])
+ctl.gains = np.array([5.0, 5.0])
+ctl.penalty = 1.0
 
 # Dynamique en boucle fermée
 clsys = ctl + sys
 
 # Configurations de départs
-clsys.x0 =  np.array([0,0.5,0])   # crash 
+clsys.x0 =  np.array([0,0.5,0])   # crash, # crash pus ;)
 # clsys.x0 =  np.array([0,0.7,0]) # fonctionne
 
 # Simulation

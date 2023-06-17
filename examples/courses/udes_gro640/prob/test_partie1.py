@@ -5,7 +5,7 @@ import pacc2101 as pacc
 
 # Create main
 q = np.zeros(5)
-q[0] = np.pi/2
+q[0] = 0
 q[1] = 0
 q[2] = 0
 q[3] = 0

@@ -149,6 +149,7 @@ class CustomPositionController( EndEffectorKinematicController ) :
         ###################################################
         # Vos paramètres de loi de commande ici !!
         ###################################################
+        self.penalty = 1.0
         
     
     #############################
@@ -171,20 +172,18 @@ class CustomPositionController( EndEffectorKinematicController ) :
         
         # Jacobian computation
         J = self.J( q )
-        J_obj2 = 
+        
         
         # Ref and objectives
-        # Primary objectif
         r_desired   = r
         r_actual    = self.fwd_kin( q )
+        
 
         # Error
         e  = r_desired - r_actual
-        q_e = self.q_d - q
 
         # Effector space speed
-        dr_r = e * self.gains
-        dq_null = q_e * self.gains_null
+        dr_r = e * self.gains # Given at gains before function call.
         
         ################
         dq = np.zeros( self.m )  # place-holder de bonne dimension
@@ -192,9 +191,7 @@ class CustomPositionController( EndEffectorKinematicController ) :
         ##################################
         # Votre loi de commande ici !!!
         ##################################
-        J_pinv = np.linalg.pinv( J )
-        Null_p = np.identity( self.dof ) - np.dot( J_pinv , J ) # Null space projection matrix
-        dq_r = np.dot( J_pinv , dr_r ) + np.dot( Null_p, dq_null ) # Joint space speed
+        dq = np.linalg.inv(J.T @ J + (self.penalty**2)*np.identity(3)) @ (J.T @ dr_r)
 
         return dq
     
@@ -220,6 +217,7 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         
         # Label
         self.name = 'Custom Drilling Controller'
+        self.reference_xyz = np.array([0.25, 0.25, 0.45])
         
         
     #############################
@@ -233,7 +231,7 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         t  : time                     1 x 1
         
         OUPUTS
-        u  : control inputs vector    m x 1
+        tau  : control inputs vector    m x 1, ici torque au moteur
         
         """
         
@@ -254,10 +252,33 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         ##################################
         # Votre loi de commande ici !!!
         ##################################
+        tau = np.zeros(self.m)  # place-holder de bonne dimension
+                
+        # # CMD en force
+        # if r[2] >= 0.45:
+        #     f_e = np.array([0,0, 0])
+        # elif r[2] < 0.45 and r[2] >= 0.2:
+        #     f_e = np.array([0,0, -200])
+        # else:
+        #     f_e = np.array([0,0,0])
+        # tau = J.T @ f_e + g
         
-        u = np.zeros(self.m)  # place-holder de bonne dimension
-        
-        return u
+        # CMD en impedance
+        if r[2] >= 0.45:
+            Kp = np.diag([300,300,5]) # 100 N/m in x and y, 20 N/m in z
+            Kd = np.diag([50,50,1]) # 10 N/m/s in x and y, 1 N/m/s in z
+            f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
+        elif r[2] < 0.45 and r[2] >= 0.2:
+            self.reference_xyz = np.array([0.25, 0.25, 0.2])
+            Kp = np.diag([300,300 ,0.0]) # 100 N/m in x and y, 20 N/m in z
+            Kd = np.diag([50,50, 0.0]) # 10 N/m/s in x and y, 1 N/m/s in z
+            f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
+            f_e[2] = -200 # -200 a pas lair de marcher, jsp pourquoi? Pt pas dans le bon frame?
+        else:
+            f_e = np.array([0,0, 0])
+            
+        tau = J.T @ f_e + g
+        return tau
         
     
 ###################
