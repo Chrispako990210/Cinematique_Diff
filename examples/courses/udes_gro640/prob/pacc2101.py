@@ -13,6 +13,9 @@ Fichier d'amorce pour les livrables de la problématique GRO640'
 """
 
 import numpy as np
+import scipy as sp
+from mpl_toolkits import mplot3d # for plotting and debug only
+import matplotlib.pyplot as plt
 
 from pyro.control  import robotcontrollers
 from pyro.control.robotcontrollers import EndEffectorPD
@@ -265,26 +268,29 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         
         # CMD en impedance
         if r[2] >= 0.45:
-            Kp = np.diag([300,300,5]) # 100 N/m in x and y, 20 N/m in z
-            Kd = np.diag([50,50,1]) # 10 N/m/s in x and y, 1 N/m/s in z
+            Kp = np.diag([50,50,2]) # 50 N/m in x and y, 2 N/m in z
+            Kd = np.diag([10,10,1]) # 10 N/m/s in x and y, 1 N/m/s in z
             f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
         elif r[2] < 0.45 and r[2] >= 0.2:
-            self.reference_xyz = np.array([0.25, 0.25, 0.2])
-            Kp = np.diag([300,300 ,0.0]) # 100 N/m in x and y, 20 N/m in z
-            Kd = np.diag([50,50, 0.0]) # 10 N/m/s in x and y, 1 N/m/s in z
+            # self.reference_xyz = np.array([0.25, 0.25, 0.2]) cette ligne peut etre omise
+            Kp = np.diag([10,10 ,0.0]) # 100 N/m in x and y, 0 N/m in z
+            Kd = np.diag([5,5, 0.0]) # 10 N/m/s in x and y, 0 N/m/s in z
             f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
             f_e[2] = -200 # -200 a pas lair de marcher, jsp pourquoi? Pt pas dans le bon frame?
         else:
             f_e = np.array([0,0, 0])
-            
-        tau = J.T @ f_e + g
+        tau = (J.T @ f_e) + g
         return tau
         
     
 ###################
 # Part 4
 ###################
-        
+
+# def discretize_time(final_time, num_steps):
+#     timestep = final_time / num_steps  # Calculate the timestep
+#     time_values = [i * timestep/final_time for i in range(num_steps + 1)]  # Generate the time values
+#     return time_values
     
 def goal2r( r_0 , r_f , t_f ):
     """
@@ -317,15 +323,50 @@ def goal2r( r_0 , r_f , t_f ):
     
     #################################
     # Votre code ici !!!
-    ##################################
+    #################################
     
+    # Calculate the time vector
+    t = np.linspace(0, t_f, l)
+
+    # Calculate the trajectory
+    s_r = np.zeros(l) # For 0 to 1
+    s_dr = np.zeros(l)
+    s_ddr = np.zeros(l)
     
+    #  Vecteur erreur
+    v_r = r_f - r_0
+    
+    for i, t_i in enumerate(t): # Calcul les profils temporels et chemin polynomiaux de degre 3
+        # s(t)
+        s_r[i] = (3/t_f**2)*t_i**2 -(2/t_f**3)*t_i**3
+        s_dr[i] = (6/t_f**2)*t_i - (6/t_f**3)*t_i**2
+        s_ddr[i] = (6/t_f**2) - (12/t_f**3)*t_i
+        
+    # Dot product 3x1 with 1x1000 = 3x1000
+    # r(s)
+    r = np.outer(v_r, s_r) # dot product 
+    for i in range(l):
+        r[:, i] += r_0
+    dr = np.outer(v_r, s_dr)
+    ddr = np.outer(v_r, s_ddr)
+    
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot3D(r[0,:], r[1,:], r[2,:], 'gray')
+    print(r[:,0])
+    print(r[:,l-1])
+
     return r, dr, ddr
 
-
+def systeme_equations_non_lineaires( q : np.array, r : np.array, manipulator):
+    e_x = ((manipulator.l2*np.cos(q[1]) + manipulator.l3*np.cos(q[1]+q[2]))*np.cos(q[0])) - r[0]
+    e_y = ((manipulator.l2*np.cos(q[1]) + manipulator.l3*np.cos(q[1]+q[2]))*np.sin(q[0])) -r[1]
+    e_z = (manipulator.l1 + manipulator.l2*np.sin(q[1]) + manipulator.l3*np.sin(q[1]+q[2])) - r[2]
+    
+    return np.array([e_x, e_y, e_z])
+    
 def r2q( r, dr, ddr , manipulator ):
     """
-
     Parameters
     ----------
     r   : numpy array float 3 x l
@@ -341,6 +382,7 @@ def r2q( r, dr, ddr , manipulator ):
     ddq : numpy array float 3 x l
 
     """
+    
     # Time discretization
     l = r.shape[1]
     
@@ -357,13 +399,25 @@ def r2q( r, dr, ddr , manipulator ):
     ##################################
     
     
+    
+    
+    #Initial conditions
+    q[:,0] = np.array([0, (23/60)*np.pi, -(7/36)*np.pi]) # "Starting Guess for non lin equation solver"
+    dq[:,0] = np.array([0, 0, 0])
+    
+    # Solve systeme d'equations non-lineaires
+    
+    for i in range(l-1):
+        # TODO corriger le bug du dernier index manquant pour ddq, voir solution a Math
+        q[:,i+1] = sp.optimize.fsolve(systeme_equations_non_lineaires, q[:,i], args = (r[:,i+1], manipulator))
+        dq[:,i+1] = np.linalg.inv(manipulator.J(q[:,i+1])) @ dr[:,i+1]
+        ddq[:,i] = np.linalg.inv(manipulator.J(q[:,i])) @ ddr[:,i] - manipulator.Jd(q[:,i], dq[:,i]) @ dq[:,i]
+    
     return q, dq, ddq
-
 
 
 def q2torque( q, dq, ddq , manipulator ):
     """
-
     Parameters
     ----------
     q   : numpy array float 3 x l
@@ -377,6 +431,7 @@ def q2torque( q, dq, ddq , manipulator ):
     tau   : numpy array float 3 x l
 
     """
+    
     # Time discretization
     l = q.shape[1]
     

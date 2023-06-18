@@ -24,8 +24,8 @@ ctl   = CustomDrillingController( model ) # Empty do nothing controller template
 clsys = ctl + sys
 
 # États initiaux
-# clsys.x0 =  np.array([0.7,1.45,-1.4,0,0,0]) #  Tombe dans le trou
-clsys.x0 =  np.array([0,1.4,-1.3,0,0,0]) #
+clsys.x0 =  np.array([0.7,1.45,-1.4,0,0,0]) #  Tombe dans le trou
+# clsys.x0 =  np.array([0,1.4,-1.3,0,0,0]) #
 
 # Simulation
 tf = 10

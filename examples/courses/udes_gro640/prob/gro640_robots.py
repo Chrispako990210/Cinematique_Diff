@@ -281,6 +281,30 @@ class DrillingRobot( ThreeLinkManipulator3D ):
         
         return J
     
+    def Jd(self, q, dq ):
+        """
+        Derivative of Jacobian matrix 
+        ----------------------------------
+        dim( Jd ) = ( dim of task-space , robot DoF )
+        """
+        Jd = np.zeros((3,3))
+        [c1, s2, c2, s3, c3, s1, c23, s23] = self.trig(q)
+        l2     = self.l2
+        l3     = self.l3
+        
+        Jd[0, 0] = -c1 * (l3 * c23 + l2 * c2) * dq[0] + s1 * (l3 * s23 + l2 * s2) * dq[1] + l3 * s23 * s1 * dq[2]
+        Jd[0, 1] = s1 * (l3 * s23 + l2 * s2) * dq[0] - c1 * (l3 * c23 + l2 * c2) * dq[1] - l3 * c23 * c1 * dq[2]
+        Jd[0, 2] = l3*s1*s23*dq[0] - l3*c1*c23*dq[1] - l3*c1*c23*dq[2]
+        
+        Jd[1, 0] = -s1 * (l3 * c23 + l2 * c2) * dq[0] - c1 * (l3 * s23 + l2 * s2) * dq[1] - l3 * s23 * c1 * dq[2]
+        Jd[1, 1] = -c1 * (l3 * s23 + l2 * s2) * dq[0] - s1 * (l3 * c23 + l2 * c2) * dq[1] - l3 * c23 * s1 * dq[2]
+        Jd[1, 2] = -l3*c1*s23*dq[0] - l3*s1*c23*dq[1] - l3*s1*c23*dq[2]
+        
+        Jd[2, 0] = 0
+        Jd[2, 1] = (-l3 * s23 -l2*s2) * dq[1] - l3*s23 * dq[2]
+        Jd[2, 2] = -l3*s23*dq[1] - l3*s23*dq[2]
+        
+        return Jd
     
     ###########################################################################
     def H(self, q ):
