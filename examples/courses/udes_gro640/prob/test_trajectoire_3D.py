@@ -6,9 +6,10 @@ Created on Fri May  1 19:51:49 2020
 @author: alex
 """
 import numpy as np
+import matplotlib.pyplot as plt
 
 from gro640_robots import DrillingRobot
-from pacc2101      import goal2r, r2q # Load your functions
+from pacc2101      import goal2r, r2q, q2torque # Load your functions
 
 # Define end-effector motion
 r_0 = np.array([  0.5,   0.0,   1.0]) # start
@@ -23,6 +24,23 @@ n = r.shape[1] # Number of time steps
 # Compute the trajectory of the joints
 model      = DrillingRobot() # Robot Model
 q, dq, ddq = r2q( r, dr, ddr , model  )
+tau, tau2 = q2torque( q, dq, ddq , model  )
+
+fig, axis = plt.subplots(3)
+fig.suptitle('Actuator torques')
+axis[0].plot(tau[0,:], label='tau1')
+axis[0].plot(tau2[0,:], label='tau2')
+axis[0].legend()
+axis[0].set_title('q1')
+axis[1].plot(tau[1,:], label='tau1')
+axis[1].plot(tau2[1,:], label='tau2')
+axis[1].legend()
+axis[1].set_title('q2')
+axis[2].plot(tau[2,:], label='tau1')
+axis[2].plot(tau2[2,:], label='tau2')
+axis[2].legend()
+axis[2].set_title('q3')
+
 
 t   = np.linspace(0, t_f, n)   # t
 q1  = q[0,:]
@@ -62,3 +80,7 @@ sys.plot_trajectory('x')
 
 # Visualise x-y-z trajectory of the end-effector
 sys.plot_end_effector_trajectory()
+
+
+
+

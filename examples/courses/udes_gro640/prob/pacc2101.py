@@ -220,8 +220,11 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         
         # Label
         self.name = 'Custom Drilling Controller'
-        self.reference_xyz = np.array([0.25, 0.25, 0.45])
+        self.reference_xyz = np.array([0.25, 0.25, 0.39])
         
+    def isInBounds(self, val: float, min: float, max: float):
+        if val >= min and val <= max:
+            return True
         
     #############################
     def c( self , y , r , t = 0 ):
@@ -267,14 +270,14 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         # tau = J.T @ f_e + g
         
         # CMD en impedance
-        if r[2] >= 0.45:
+        if not self.isInBounds(r[2], 0.2, 0.40) or not self.isInBounds(r[0], 0.24, 0.26) or not self.isInBounds(r[1], 0.24, 0.26):
             Kp = np.diag([50,50,2]) # 50 N/m in x and y, 2 N/m in z
             Kd = np.diag([10,10,1]) # 10 N/m/s in x and y, 1 N/m/s in z
             f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
-        elif r[2] < 0.45 and r[2] >= 0.2:
+        elif self.isInBounds(r[2], 0.21, 0.40) and self.isInBounds(r[0], 0.24, 0.26) and self.isInBounds(r[1], 0.24, 0.26):
             # self.reference_xyz = np.array([0.25, 0.25, 0.2]) cette ligne peut etre omise
-            Kp = np.diag([10,10 ,0.0]) # 100 N/m in x and y, 0 N/m in z
-            Kd = np.diag([5,5, 0.0]) # 10 N/m/s in x and y, 0 N/m/s in z
+            Kp = np.diag([2,2 ,0.0]) # 100 N/m in x and y, 0 N/m in z
+            Kd = np.diag([1,1, 0.0]) # 10 N/m/s in x and y, 0 N/m/s in z
             f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
             f_e[2] = -200 # -200 a pas lair de marcher, jsp pourquoi? Pt pas dans le bon frame?
         else:
@@ -399,22 +402,17 @@ def r2q( r, dr, ddr , manipulator ):
     ##################################
     
     
-    
-    
     #Initial conditions
-    q[:,0] = np.array([0, (23/60)*np.pi, -(7/36)*np.pi]) # "Starting Guess for non lin equation solver"
+    q0_guess = np.array([0, 1.2, -0.6]) # "Starting Guess for non lin equation solver"
     dq[:,0] = np.array([0, 0, 0])
     
-    # Solve systeme d'equations non-lineaires
-    
-    for i in range(l-1):
-        # TODO corriger le bug du dernier index manquant pour ddq, voir solution a Math
-        q[:,i+1] = sp.optimize.fsolve(systeme_equations_non_lineaires, q[:,i], args = (r[:,i+1], manipulator))
-        dq[:,i+1] = np.linalg.inv(manipulator.J(q[:,i+1])) @ dr[:,i+1]
+    # Solve systeme d'equations non-lineaires pour chaque instant
+    for i in range(l):
+        q[:,i] = sp.optimize.fsolve(systeme_equations_non_lineaires, q0_guess, args = (r[:,i], manipulator))
+        q0_guess = q[:,i]
+        dq[:,i] = np.linalg.inv(manipulator.J(q[:,i])) @ dr[:,i]
         ddq[:,i] = np.linalg.inv(manipulator.J(q[:,i])) @ ddr[:,i] - manipulator.Jd(q[:,i], dq[:,i]) @ dq[:,i]
-    
     return q, dq, ddq
-
 
 def q2torque( q, dq, ddq , manipulator ):
     """
@@ -440,10 +438,17 @@ def q2torque( q, dq, ddq , manipulator ):
     
     # Output dimensions
     tau = np.zeros((n,l))
+    tau2 = np.zeros((n,l))
     
     #################################
     # Votre code ici !!!
     ##################################
+    for i in range(l):
+        tau[:, i] = np.linalg.inv(manipulator.B(q[:,i]))@(manipulator.H(q[:,i]) @ ddq[:,i] + 
+                     manipulator.C(q[:,i], dq[:,i]) @ dq[:,i] + 
+                     manipulator.d(q[:,i], dq[:,i]) + 
+                     manipulator.g(q[:,i]))
+        
+        tau2[:, i] = manipulator.actuator_forces(q[:,i], dq[:,i], ddq[:,i])
     
-    
-    return tau
+    return tau, tau2
