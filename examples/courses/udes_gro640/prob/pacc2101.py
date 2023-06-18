@@ -305,11 +305,6 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
 ###################
 # Part 4
 ###################
-
-# def discretize_time(final_time, num_steps):
-#     timestep = final_time / num_steps  # Calculate the timestep
-#     time_values = [i * timestep/final_time for i in range(num_steps + 1)]  # Generate the time values
-#     return time_values
     
 def goal2r( r_0 , r_f , t_f ):
     """
