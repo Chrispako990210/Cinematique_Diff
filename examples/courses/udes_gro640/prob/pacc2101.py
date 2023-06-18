@@ -120,7 +120,7 @@ def f(q):
     DH  = np.zeros((DDL,4))
 
     # Defining DH parameters
-    DH[0,:] = [0.033, 0.08, q[0], -np.pi/2]
+    DH[0,:] = [0.033, 0.147, q[0], -np.pi/2]
     DH[1,:] = [0.155, 0, q[1]- (np.pi/2), 0]
     DH[2,:] = [0.135, 0, q[2], 0]
     DH[3,:] = [0, 0, q[3] + (np.pi/2), np.pi/2]
@@ -260,28 +260,29 @@ class CustomDrillingController( robotcontrollers.RobotController ) :
         ##################################
         tau = np.zeros(self.m)  # place-holder de bonne dimension
                 
-        # # CMD en force
-        # if r[2] >= 0.45:
-        #     f_e = np.array([0,0, 0])
-        # elif r[2] < 0.45 and r[2] >= 0.2:
-        #     f_e = np.array([0,0, -200])
-        # else:
-        #     f_e = np.array([0,0,0])
-        # tau = J.T @ f_e + g
-        
-        # CMD en impedance
+        # CMD en force
         if not self.isInBounds(r[2], 0.2, 0.40) or not self.isInBounds(r[0], 0.24, 0.26) or not self.isInBounds(r[1], 0.24, 0.26):
-            Kp = np.diag([50,50,2]) # 50 N/m in x and y, 2 N/m in z
-            Kd = np.diag([10,10,1]) # 10 N/m/s in x and y, 1 N/m/s in z
-            f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
+            f_e = np.array([100, 100, -10])
         elif self.isInBounds(r[2], 0.21, 0.40) and self.isInBounds(r[0], 0.24, 0.26) and self.isInBounds(r[1], 0.24, 0.26):
-            # self.reference_xyz = np.array([0.25, 0.25, 0.2]) cette ligne peut etre omise
-            Kp = np.diag([2,2 ,0.0]) # 100 N/m in x and y, 0 N/m in z
-            Kd = np.diag([1,1, 0.0]) # 10 N/m/s in x and y, 0 N/m/s in z
-            f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
-            f_e[2] = -200 # -200 a pas lair de marcher, jsp pourquoi? Pt pas dans le bon frame?
+            f_e = np.array([0,0, -200])
         else:
-            f_e = np.array([0,0, 0])
+            f_e = np.array([0,0,0])
+        tau = J.T @ f_e + g
+        
+        # # CMD en impedance
+        # if not self.isInBounds(r[2], 0.2, 0.40) or not self.isInBounds(r[0], 0.24, 0.26) or not self.isInBounds(r[1], 0.24, 0.26):
+        #     Kp = np.diag([50,50,2]) # 50 N/m in x and y, 2 N/m in z
+        #     Kd = np.diag([10,10,1]) # 10 N/m/s in x and y, 1 N/m/s in z
+        #     f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
+        # elif self.isInBounds(r[2], 0.21, 0.40) and self.isInBounds(r[0], 0.24, 0.26) and self.isInBounds(r[1], 0.24, 0.26):
+        #     # self.reference_xyz = np.array([0.25, 0.25, 0.2]) cette ligne peut etre omise
+        #     Kp = np.diag([2,2 ,0.0]) # 100 N/m in x and y, 0 N/m in z
+        #     Kd = np.diag([1,1, 0.0]) # 10 N/m/s in x and y, 0 N/m/s in z
+        #     f_e = Kp @ (self.reference_xyz - r) + Kd @ (- J @ dq)
+        #     f_e[2] = -200 # -200 a pas lair de marcher, jsp pourquoi? Pt pas dans le bon frame?
+        # else:
+        #     f_e = np.array([0,0, 0])
+            
         tau = (J.T @ f_e) + g
         return tau
         
